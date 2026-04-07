@@ -1,0 +1,55 @@
+name: Autograding Tests
+on:
+  - push
+  - workflow_dispatch
+  - repository_dispatch
+permissions:
+  checks: write
+  actions: read
+  contents: read
+jobs:
+  run-autograding-tests:
+    runs-on: ubuntu-24.04
+    if: github.actor != 'github-classroom[bot]'
+    steps:
+    # 1. Checkout Code
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+    # 2. Setup ROS 2 Jazzy Environment
+      - name: Setup ROS 2
+        uses: ros-tooling/setup-ros@v0.7
+        with:
+          required-ros-distributions: jazzy
+
+    # 2.5 Check Student Edits
+      - name: Verify Student Edits
+        run: |
+          if ! grep -q "add_executable" entri_ros2_basics_cpp/CMakeLists.txt; then
+            echo "::error::CMakeLists.txt is not completely filled! Please add 'add_executable' and related targets."
+            exit 1
+          fi
+          if ! grep -q "<depend>rclcpp</depend>" entri_ros2_basics_cpp/package.xml; then
+            echo "::error::package.xml is not completely filled! Please add the '<depend>rclcpp</depend>' dependency."
+            exit 1
+          fi
+        shell: bash
+
+    # 3. Build Workspace
+      - name: Build Workspace
+        run: |
+          source /opt/ros/jazzy/setup.bash
+          colcon build --packages-select entri_ros2_basics_cpp
+        shell: bash
+
+    # 4. Run Autograding
+      - name: Autograding
+        uses: education/autograding@v1
+
+    # 5. Upload Compiled Binaries
+      - name: Upload Compiled Binaries
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: student-compiled-binaries
+          path: install/
